@@ -27,209 +27,102 @@ import org.bukkit.event.world.StructureGrowEvent;
 import org.bukkit.inventory.InventoryHolder;
 
 import uk.co.mobsoc.Teams.Main;
+import uk.co.mobsoc.Teams.Raid.RaidBlockData;
+import uk.co.mobsoc.Teams.Raid.RaidCollection;
 
+/**
+ * Listen for all events which may be a Raid, Unclaimed traversal, or other event where it should eventually revert to original state
+ * @author triggerhapp
+ *
+ */
 public class RaidListener implements Listener{
+	private Main main;
+
 	public RaidListener(Main main){
+		this.main = main;
 		Bukkit.getPluginManager().registerEvents(this, main);
 	}
 	
-	/**
-	 * Adds broken blocks to the list of blocks that return to initial state
-	 * @param event
-	 */
-	@EventHandler(priority=EventPriority.MONITOR)
 	public void onBlockBreak(BlockBreakEvent event){
 		if(event.isCancelled()){ return; }
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		if(game.isParticipant(event.getPlayer())){
-			BlockData bd = new BlockData(event.getBlock());
-			MobsGames.getGame().addRevert(bd);
+		RaidBlockData rbd = new RaidBlockData(event.getBlock());
+		for(RaidCollection raid : main.getAllRaids()){
+			if(raid.actionIsRaid(event.getPlayer(), rbd)){
+				raid.addBlock(rbd);
+			}
 		}
 	}
 	
-	/**
-	 * Adds Placed blocks to the list of blocks that return to initial state
-	 * @param event
-	 */
-	@EventHandler(priority=EventPriority.MONITOR)
 	public void onPlacePlace(BlockPlaceEvent event){
 		if(event.isCancelled()){ return; }
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		if(game.isParticipant(event.getPlayer())){
-			BlockData bd = new BlockData(event.getBlock());
-			bd.data = event.getBlockReplacedState().getRawData();
-			bd.id = event.getBlockReplacedState().getTypeId();
-			MobsGames.getGame().addRevert(bd);
-		}
-	}
-	
-
-
-	/**
-	 * Add Exploded blocks to the list of blocks that return to initial state.
-	 * This might be a bit buggy, since it does not check (Because it is not logically possible) if the explosion is related to the game or not.
-	 * @param event
-	 */
-	@EventHandler(priority=EventPriority.MONITOR)
-	public void onExplosion(EntityExplodeEvent event){
-		AbstractGame game = MobsGames.getGame();
-		if(game!=null){
-			for(Block block : event.blockList()){
-				game.addRevert(new BlockData(block));
+		RaidBlockData rbd = new RaidBlockData(event.getBlock());
+		for(RaidCollection raid : main.getAllRaids()){
+			if(raid.actionIsRaid(event.getPlayer(), rbd)){
+				raid.addBlock(rbd);
 			}
 		}
 	}
 
-	/**
-	 * Add Liquid that flows into the list of blocks that return to initial state.
-	 * This might be a bit buggy, since it does not check (due to excessive CPU usage) if the liquid is related to the game or not.
-	 * @param event
-	 */
-	@EventHandler(priority=EventPriority.MONITOR)
+	public void onExplosion(EntityExplodeEvent event){
+		if(event.isCancelled()){ return; }
+		for(Block b : event.blockList()){
+			RaidBlockData rbd = new RaidBlockData(b);
+			for(RaidCollection raid : main.getAllRaids()){
+				if(raid.actionIsRaid(rbd)){
+					raid.addBlock(rbd);
+				}
+			}
+		}
+	}
+
 	public void onLiquidFlow(BlockFromToEvent event){
-		AbstractGame game = MobsGames.getGame();
-		if(game!=null){
-			game.addRevert(new BlockData(event.getToBlock()));
+		if(event.isCancelled()){ return ; }
+		RaidBlockData rbd = new RaidBlockData(event.getToBlock());
+		for(RaidCollection raid : main.getAllRaids()){
+			if(raid.actionIsRaid(rbd)){
+				raid.addBlock(rbd);
+			}
 		}
 	}
 	
-	/**
-	 * Add Liquid that is taken to the list of blocks to return to initial state
-	 * @param event
-	 */
-	@EventHandler(priority=EventPriority.MONITOR)
 	public void onBucketFill(PlayerBucketFillEvent event){
 		if(event.isCancelled()){ return; }
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		if(game.isParticipant(event.getPlayer())){
-			BlockData bd = new BlockData(event.getBlockClicked().getRelative(event.getBlockFace()));
-			game.addRevert(bd);
+		RaidBlockData rbd = new RaidBlockData(event.getBlockClicked().getRelative(event.getBlockFace()));
+		for(RaidCollection raid : main.getAllRaids()){
+			if(raid.actionIsRaid(rbd)){
+				raid.addBlock(rbd);
+			}
 		}
 	}
 	
-	/**
-	 * Add Liquid that is placed to the list of blocks to return to initial state
-	 * @param event
-	 */
-	@EventHandler(priority=EventPriority.MONITOR)
 	public void onBucketEmpty(PlayerBucketEmptyEvent event){
 		if(event.isCancelled()){ return; }
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		if(game.isParticipant(event.getPlayer())){
-			BlockData bd = new BlockData(event.getBlockClicked().getRelative(event.getBlockFace()));
-			game.addRevert(bd);
-		}
-	}
-	
-	/**
-	 * Add Interacted items to the list of blocks to return to initial state
-	 * @param event
-	 */
-	@EventHandler(priority=EventPriority.MONITOR)
-	public void onInteractBlock(PlayerInteractEvent event){
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		if(event.isCancelled()){ return; }
-		if(event.hasBlock()){
-			BlockData bd = new BlockData(event.getClickedBlock());
-			game.addRevert(bd);
-			//bd = new BlockData(event.getClickedBlock().getRelative(event.getBlockFace()));
-			//game.addRevert(bd);
-
-		}
-	}
-
-	@EventHandler(priority=EventPriority.MONITOR)
-	public void onInventoryOpen(InventoryOpenEvent event){
-		if(event.isCancelled()){ return; }
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		if(game.isParticipant((Player) event.getPlayer())){
-			InventoryHolder iH = event.getInventory().getHolder();
-			// To Hell with depreciating a perfectly good class.
-			if(iH instanceof ContainerBlock){
-				game.addRevert(iH);
+		RaidBlockData rbd = new RaidBlockData(event.getBlockClicked().getRelative(event.getBlockFace()));
+		for(RaidCollection raid : main.getAllRaids()){
+			if(raid.actionIsRaid(rbd)){
+				raid.addBlock(rbd);
 			}
-			
 		}
 	}
 	
-	@EventHandler(priority=EventPriority.MONITOR)
-	public void onBlockPhysicsEvent(BlockPhysicsEvent event){
+	public void onInteractBlock(PlayerInteractEvent event){
 		if(event.isCancelled()){ return; }
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		game.addRevert(new BlockData(event.getBlock()));
+		if(!event.hasBlock()){ return; }
+		RaidBlockData rbd = new RaidBlockData(event.getClickedBlock());
+		for(RaidCollection raid : main.getAllRaids()){
+			if(raid.actionIsRaid(event.getPlayer(), rbd)){
+				raid.addBlock(rbd);
+			}
+		}
 	}
 	
-	@EventHandler(priority=EventPriority.MONITOR)
 	public void onEntityBlockFormEvent(EntityBlockFormEvent event){
 		if(event.isCancelled()){ return; }
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		BlockData bd = new BlockData(event.getBlock());
-		game.addRevert(bd);	
-	}
-	
-	@EventHandler(priority=EventPriority.MONITOR)
-	public void onBlockFormEvent(BlockFormEvent event){
-		if(event.isCancelled()){ return; }
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		BlockData bd = new BlockData(event.getBlock());
-		game.addRevert(bd);		
-	}
-	
-	@EventHandler(priority=EventPriority.MONITOR)
-	public void onBlockSpreadEvent(BlockSpreadEvent event){
-		if(event.isCancelled()){ return; }
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		BlockData bd = new BlockData(event.getBlock());
-		game.addRevert(bd);
-	}
-	
-	@EventHandler(priority=EventPriority.MONITOR)
-	public void onBlockFadeEvent(BlockFadeEvent event){
-		if(event.isCancelled()){ return; }
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		BlockData bd = new BlockData(event.getBlock());
-		game.addRevert(bd);		
-	}
-	
-	@EventHandler(priority=EventPriority.MONITOR)
-	public void onLeavesDecayEvent(LeavesDecayEvent event){
-		if(event.isCancelled()){ return; }
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		BlockData bd = new BlockData(event.getBlock());
-		game.addRevert(bd);		
-	}
-	
-	@EventHandler(priority=EventPriority.MONITOR)
-	public void onEntityChangeBlockEvent(EntityChangeBlockEvent event){
-		if(event.isCancelled()){ return; }
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		BlockData bd = new BlockData(event.getBlock());
-		game.addRevert(bd);
-		//System.out.println("Block changed from "+event.getBlock().getTypeId()+" to "+event.getTo().getId()+" by "+event.getEntity());
-	}
-	
-	@EventHandler(priority=EventPriority.MONITOR)
-	public void onStructureGrowEvent(StructureGrowEvent event){
-		if(event.isCancelled()){ return; }
-		AbstractGame game = MobsGames.getGame();
-		if(game==null){ return; }
-		for(BlockState bs : event.getBlocks()){
-			BlockData bd = new BlockData(bs.getBlock());
-			game.addRevert(bd);
+		RaidBlockData rbd = new RaidBlockData(event.getBlock());
+		for(RaidCollection raid : main.getAllRaids()){
+			if(raid.actionIsRaid(rbd)){
+				raid.addBlock(rbd);
+			}
 		}
 	}
-
 }

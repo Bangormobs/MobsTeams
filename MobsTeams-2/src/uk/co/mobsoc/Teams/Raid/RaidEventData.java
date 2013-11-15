@@ -1,18 +1,22 @@
-package uk.co.mobsoc.Teams.Data;
+package uk.co.mobsoc.Teams.Raid;
+
+import java.util.ArrayList;
 
 import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 
 import uk.co.mobsoc.Teams.Main;
+import uk.co.mobsoc.Teams.Data.Government;
 
-public class RaidData implements Runnable{
+public class RaidEventData implements Runnable,RaidCollection{
 	// This data is not made permanent.
 	long timeElapsed=0;
 	Government attacker, defender;
 	int timerID=-1;
+	ArrayList<RaidBlockData> blockList = new ArrayList<RaidBlockData>();
 	
-	public RaidData(Government attacker, Government defender){
+	public RaidEventData(Government attacker, Government defender){
 		this.attacker = attacker; this.defender = defender;
 	}
 	
@@ -47,12 +51,44 @@ public class RaidData implements Runnable{
 		return State.INVALID;
 	}
 	
-	public boolean actionIsRaid(Player player, Block block){
+	/***
+	 * For non-player block changes
+	 * @param block
+	 * @return
+	 */
+	@Override
+	public boolean actionIsRaid(RaidBlockData block){
+		if(defender.ownsBlock(block.getCurrectBlockAt())){
+			return true;
+		}
+		return false;
+	}
+	
+	/***
+	 * For player actions
+	 */
+	@Override
+	public boolean actionIsRaid(Player player, RaidBlockData block){
 		if(attacker.hasMember(player)){
-			if(defender.ownsBlock(block)){
+			if(defender.ownsBlock(block.getCurrectBlockAt())){
 				return true;
 			}
 		}
 		return false;
+	}
+
+	@Override
+	public ArrayList<RaidBlockData> getAllAlteredBlocks() {
+		return blockList;
+	}
+
+	@Override
+	public void addBlock(RaidBlockData block) {
+		for(RaidBlockData rbd : blockList){
+			if(rbd.isEqualLocation(block)){
+				return;
+			}
+		}
+		blockList.add(block);
 	}
 }
